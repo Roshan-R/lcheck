@@ -24,7 +24,10 @@ pub enum SPDXLicense {
     GPL3,
     #[strum(serialize = "BSD-3-Clause", to_string = "BSD-3-Clause")]
     BSD3,
-    #[strum(serialize = "Python Software Foundation License")]
+    #[strum(
+        serialize = "Python Software Foundation License",
+        to_string = "Python-2.0"
+    )]
     PSFL,
 }
 
