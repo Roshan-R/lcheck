@@ -11,8 +11,21 @@ use license::{is_compatibile, SPDXLicense};
 
 use colored::Colorize;
 
+use clap::Parser;
+
+/// cli tool to check license compatibility across your project dependencies
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Show verbose output
+    #[arg(short, long)]
+    verbose: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
+    let args = Args::parse();
+
     let json_buf = include_str!("../data/osadl-matrix.json");
     let matrix: serde_json::Value = serde_json::from_str(json_buf)?;
     let client = Client::new();
@@ -20,7 +33,7 @@ async fn main() -> Result<(), Error> {
     let languages_map = HashMap::from([("pyproject.toml", languages::python::Python {})]);
 
     let mut language = None;
-    println!("Scanning project dependencies...");
+    println!("{}", "Scanning project dependencies...".blue());
     for project_file in languages_map.keys() {
         if fs::exists(project_file).unwrap() {
             language = Some(languages_map.get(project_file).unwrap());
@@ -68,20 +81,36 @@ async fn main() -> Result<(), Error> {
         })
         .collect();
 
-    println!("Dependency Report");
+    println!("{}", "Dependency Scan Summary".green());
     println!("--------------------------------------------");
-    println!("Total dependencies identified: {}", num_deps);
+    println!("{} {}", "Total dependencies:".yellow(), num_deps);
     println!();
 
+    if args.verbose {
+        println!("All dependencies: ");
+        let mut all_deps = packages.clone();
+        let incomplete_deps = incomplete_deps.clone();
+        all_deps.extend(incomplete_deps);
+
+        for dep in all_deps {
+            let license = match dep.license {
+                Some(l) => l.to_string(),
+                None => "Unknown".to_string(),
+            };
+            println!("  - {:<20} ({})", dep.name, license);
+        }
+        println!();
+    }
+
     if !incomplete_deps.is_empty() {
-        println!("Missing license information for:");
+        println!("{}", "Missing license information for:".red());
         for dep in incomplete_deps {
             println!("  -{}", dep.name.to_string());
         }
     }
 
     if !incompatible.is_empty() {
-        println!("License conflicts detected:");
+        println!("{}", "License conflicts detected.".red());
         for dep in incompatible {
             println!(
                 "   - {} ({}) conflicts with {} ({})",
@@ -94,7 +123,7 @@ async fn main() -> Result<(), Error> {
         println!();
     } else {
         println!();
-        println!("No conflicts detected");
+        println!("{}", "No license conflicts detected".green());
     }
 
     Ok(())
