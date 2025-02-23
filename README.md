@@ -4,7 +4,7 @@
 
 ## Features
 
-- **Automatic Dependency Detection** – Scans dependencies from `Cargo.toml`, `pyproject.toml`, and other package files.
+- **Automatic Dependency Detection** – Scans dependencies from `Cargo.toml`, `pyproject.toml`.
 - **License Verification** – Retrieves license information from public sources.
 - **Conflict Detection** – Highlights incompatible licenses between dependencies.
 - **Modular Architecture** – Designed with separate, well-structured modules for each language, ensuring maintainability and easy extensibility..
@@ -45,6 +45,11 @@ Options:
   -h, --help     Print help
   -V, --version  Print version
 ```
+
+## TODO
+ - handle projects which are dual licensed
+ - add more languages: go, javascript, etc.
+ - store package metadata to global cache in file system to avoid calling APIs 
 
 ## Credits
 
