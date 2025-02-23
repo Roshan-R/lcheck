@@ -1,8 +1,7 @@
 use anyhow::Error;
 use itertools::Itertools;
-use pyproject_toml::PyProjectToml;
 use reqwest::Client;
-use std::fs;
+use std::{collections::HashMap, fs};
 
 mod languages;
 mod license;
@@ -14,21 +13,34 @@ use license::{is_compatibile, SPDXLicense};
 async fn main() -> Result<(), Error> {
     let json_buf = include_str!("../data/osadl-matrix.json");
     let matrix: serde_json::Value = serde_json::from_str(json_buf)?;
-
     let client = Client::new();
-    let buf = fs::read_to_string("pyproject.toml")?;
-    let pyproject: PyProjectToml = toml::from_str(buf.as_str())?;
 
-    let extractor = languages::python::Python {};
+    let languages_map = HashMap::from([("pyproject.toml", languages::python::Python {})]);
+
+    let mut language = None;
+    println!("Scanning project dependencies...");
+    for project_file in languages_map.keys() {
+        if fs::exists(project_file).unwrap() {
+            language = Some(languages_map.get(project_file).unwrap());
+            break;
+        }
+    }
+
+    if language.is_none() {
+        panic!("Could not autodetect the project language, exiting..");
+    }
+
+    let language = language.unwrap();
+
+    let deps = language.get_dependencies();
+    let num_deps = deps.len();
 
     let mut tasks = Vec::new();
-    for dep in pyproject.project.unwrap().dependencies.unwrap() {
-        let name = dep.name.clone().as_ref().to_string();
-
+    for dep in deps {
         let client = client.clone();
-        let extractor = extractor.clone();
+        let extractor = language.clone();
         tasks.push(tokio::spawn(async move {
-            extractor.get_license(name, &client).await
+            extractor.get_license(dep, &client).await
         }));
     }
 
@@ -44,8 +56,6 @@ async fn main() -> Result<(), Error> {
         }
     }
 
-    dbg!(&packages);
-
     let incompatible: Vec<_> = packages
         .iter()
         .combinations(2)
@@ -56,7 +66,34 @@ async fn main() -> Result<(), Error> {
         })
         .collect();
 
-    dbg!(incompatible);
+    println!("Dependency Report");
+    println!("--------------------------------------------");
+    println!("Total dependencies identified: {}", num_deps);
+    println!();
+
+    if !incomplete_deps.is_empty() {
+        println!("Missing license information for:");
+        for dep in incomplete_deps {
+            println!("  -{}", dep.name.to_string());
+        }
+    }
+
+    if !incompatible.is_empty() {
+        println!("License conflicts detected:");
+        for dep in incompatible {
+            println!(
+                "   - {} ({}) conflicts with {} ({})",
+                dep[0].name,
+                dep[0].license.unwrap(),
+                dep[1].name,
+                dep[1].license.unwrap()
+            );
+        }
+        println!();
+    } else {
+        println!();
+        println!("No conflicts detected");
+    }
 
     Ok(())
 }

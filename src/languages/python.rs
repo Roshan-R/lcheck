@@ -1,18 +1,19 @@
 use crate::languages::common::LanguageExtractor;
 use crate::license::PackageLicense;
 use crate::SPDXLicense;
+use pyproject_toml::PyProjectToml;
 use regex::Regex;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::string::ToString;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Python {}
 
 impl LanguageExtractor for Python {
     async fn get_license(&self, package_name: String, client: &Client) -> PackageLicense {
         let url = format!("https://pypi.org/pypi/{}/json", package_name);
-        println!("Getting license information for {}", package_name);
 
         let resp = client.get(url).send().await.unwrap();
         let metadata: PyPi = resp.json().await.unwrap();
@@ -20,6 +21,23 @@ impl LanguageExtractor for Python {
             name: String::from(package_name),
             license: metadata.license(),
         }
+    }
+    fn get_dependencies(&self) -> Vec<String> {
+        println!("Python project detected (pyproject.toml found)");
+        println!();
+        let buf = fs::read_to_string("pyproject.toml").unwrap();
+        let pyproject: PyProjectToml = toml::from_str(buf.as_str())
+            .expect("Could not parse pyproject.toml, check if it's correct or not");
+
+        return pyproject
+            .project
+            .expect("No project field found in pyproject.toml")
+            .dependencies
+            .expect("No dependencies found in pyproject.toml")
+            .to_vec()
+            .iter()
+            .map(|t| t.name.to_string())
+            .collect();
     }
 }
 
