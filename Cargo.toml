@@ -11,7 +11,6 @@ regex = "1.11.1"
 reqwest = { version = "*", features = ["json", "gzip", "brotli", "zstd", "deflate"] }
 serde = { version = "1.0.218", features = ["derive"] }
 serde_json = "1.0.139"
-spdx = "0.10.8"
 strum = "0.27.1"
 strum_macros = "0.27.1"
 tokio = { version = "*", features = ["full"] }
