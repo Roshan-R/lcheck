@@ -1,102 +1,14 @@
 use anyhow::Error;
 use itertools::Itertools;
 use pyproject_toml::PyProjectToml;
-use regex::Regex;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use std::fs;
-use std::string::ToString;
 
-mod spdx;
+mod languages;
+mod license;
 
-use spdx::SPDXLicense;
-
-#[derive(Serialize, Deserialize, Debug)]
-struct PyPi {
-    info: PyPiInfo,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct PyPiInfo {
-    classifiers: Vec<String>,
-    license: Option<String>,
-}
-
-impl PyPi {
-    fn license(&self) -> Option<SPDXLicense> {
-        let info = self.info.clone();
-        let mut license = String::new();
-
-        if let Some(lic) = info.license {
-            // When the license is the whole text file and not just the license name
-            if lic.len() > 100 {
-                license = lic.split_whitespace().take(2).collect::<Vec<_>>().join(" ");
-            }
-            license = lic
-        } else {
-            for classifier in info.classifiers {
-                let re = Regex::new(r"License :: OSI Approved :: (.*)$").unwrap();
-                if let Some(caps) = re.captures(classifier.as_str()) {
-                    license = caps.get(1).unwrap().as_str().to_string();
-                    break;
-                }
-            }
-        }
-
-        return match license.parse::<SPDXLicense>() {
-            Ok(license) => Some(license),
-            Err(_) => None,
-        };
-    }
-}
-#[derive(Debug, Clone)]
-struct PackageLicense {
-    name: String,
-    license: Option<SPDXLicense>,
-}
-
-async fn get_license_from_pypi(package_name: String, client: &Client) -> PackageLicense {
-    let url = format!("https://pypi.org/pypi/{}/json", package_name);
-    println!("Getting license information for {}", package_name);
-
-    let resp = client.get(url).send().await.unwrap();
-    let metadata: PyPi = resp.json().await.unwrap();
-    PackageLicense {
-        name: String::from(package_name),
-        license: metadata.license(),
-    }
-}
-
-fn is_compatibile(
-    license_a: &Option<SPDXLicense>,
-    license_b: &Option<SPDXLicense>,
-    matrix: &serde_json::Value,
-) -> bool {
-    let (Some(license_a), Some(license_b)) = (license_a, license_b) else {
-        return false;
-    };
-
-    let result = matrix
-        .get(license_a.to_string())
-        .and_then(|matrix_a| matrix_a.get(license_b.to_string()))
-        .and_then(|value| value.as_str());
-
-    match result {
-        Some("Yes") | Some("Same") => true,
-        Some(other) => {
-            eprintln!("Unexpected value in matrix: {}", other);
-            false
-        }
-        None => {
-            eprintln!(
-                "Entry not found in matrix for {} and {}",
-                license_a.to_string(),
-                license_b.to_string()
-            );
-            false
-        }
-    }
-}
+use languages::common::LanguageExtractor;
+use license::{is_compatibile, SPDXLicense};
 
 #[tokio::main]
 async fn main() -> Result<(), Error> {
@@ -107,13 +19,16 @@ async fn main() -> Result<(), Error> {
     let buf = fs::read_to_string("pyproject.toml")?;
     let pyproject: PyProjectToml = toml::from_str(buf.as_str())?;
 
+    let extractor = languages::python::Python {};
+
     let mut tasks = Vec::new();
     for dep in pyproject.project.unwrap().dependencies.unwrap() {
         let name = dep.name.clone().as_ref().to_string();
 
         let client = client.clone();
+        let extractor = extractor.clone();
         tasks.push(tokio::spawn(async move {
-            get_license_from_pypi(name, &client).await
+            extractor.get_license(name, &client).await
         }));
     }
 
