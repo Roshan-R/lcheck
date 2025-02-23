@@ -46,3 +46,7 @@ Options:
   -V, --version  Print version
 ```
 
+## Credits
+
+The osadl matrix used is from https://github.com/priv-kweihmann/osadl-matrix
+
