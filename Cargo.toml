@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.96"
+colored = "3.0.0"
 itertools = "0.14.0"
 pyproject-toml = "0.13.4"
 regex = "1.11.1"

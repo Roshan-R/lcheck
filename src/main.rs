@@ -9,6 +9,8 @@ mod license;
 use languages::common::LanguageExtractor;
 use license::{is_compatibile, SPDXLicense};
 
+use colored::Colorize;
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     let json_buf = include_str!("../data/osadl-matrix.json");
