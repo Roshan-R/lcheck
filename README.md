@@ -7,6 +7,7 @@
 - **Automatic Dependency Detection** – Scans dependencies from `Cargo.toml`, `pyproject.toml`, and other package files.
 - **License Verification** – Retrieves license information from public sources.
 - **Conflict Detection** – Highlights incompatible licenses between dependencies.
+- **Modular Architecture** – Designed with separate, well-structured modules for each language, ensuring maintainability and easy extensibility..
 
 ## Installation
 
